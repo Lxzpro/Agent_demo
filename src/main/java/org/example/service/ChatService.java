@@ -116,6 +116,33 @@ public class ChatService {
         return systemPromptBuilder.toString();
     }
 
+    public String buildSummaryPrompt(List<Map<String, String>> history) {
+        StringBuilder systemPromptBuilder = new StringBuilder();
+
+        // 基础系统提示
+        systemPromptBuilder.append("你是一个专业的上下文总结助手，可以把对话历史总结一下。\n");
+        systemPromptBuilder.append("不需要给出推荐进一步生成的内容。\n");
+
+        // 添加历史消息
+        if (!history.isEmpty()) {
+            systemPromptBuilder.append("--- 对话历史 ---\n");
+            for (Map<String, String> msg : history) {
+                String role = msg.get("role");
+                String content = msg.get("content");
+                if ("user".equals(role)) {
+                    systemPromptBuilder.append("用户: ").append(content).append("\n");
+                } else if ("assistant".equals(role)) {
+                    systemPromptBuilder.append("助手: ").append(content).append("\n");
+                }
+            }
+            systemPromptBuilder.append("--- 对话历史结束 ---\n\n");
+        }
+
+        systemPromptBuilder.append("请基于以上对话历史，总结一下重要内容。");
+
+        return systemPromptBuilder.toString();
+    }
+
     /**
      * 动态构建方法工具数组
      * 根据 cls.mock-enabled 决定是否包含 QueryLogsTools

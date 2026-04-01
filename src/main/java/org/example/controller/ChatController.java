@@ -110,6 +110,76 @@ public class ChatController {
         }
     }
 
+    //TODO 实现总结对话agent
+    /**
+     * 总结对话agent接口
+     * 在对话超过五轮时，把前五轮的历史对话替换成总结内容
+     * @param request
+     * @return
+     */
+    @PostMapping("/chat_summary")
+    public ResponseEntity<ApiResponse<ChatResponse>> chatSummary(@RequestBody ChatRequest request) {
+        try {
+            logger.info("---总结对话Agent---");
+            logger.info("收到对话请求 - SessionId: {}, Question: {}", request.getId(), request.getQuestion());
+
+            // 参数校验
+            if (request.getQuestion() == null || request.getQuestion().trim().isEmpty()) {
+                logger.warn("问题内容为空");
+                return ResponseEntity.ok(ApiResponse.success(ChatResponse.error("问题内容不能为空")));
+            }
+
+            // 获取或创建会话
+            SessionInfo session = getOrCreateSession(request.getId());
+
+            // 创建 DashScope API 和 ChatModel
+            DashScopeApi dashScopeApi = chatService.createDashScopeApi();
+            DashScopeChatModel chatModel = chatService.createStandardChatModel(dashScopeApi);
+
+            // 获取历史消息（注意：后续可能会清空历史，需要重新获取）
+            List<Map<String, String>> history = session.getHistory();
+            logger.info("会话历史消息对数: {}", session.getMessagePairCount());
+
+            //TODO 这里需要根据对话轮数来判断是否需要总结
+            if (session.getMessagePairCount() > 5) {
+                logger.info("---对话轮数超过5轮，需要总结对话---");
+                String summaryPrompt = chatService.buildSummaryPrompt(history);
+                ReactAgent summaryAgent = chatService.createReactAgent(chatModel, summaryPrompt);
+                String summary = chatService.executeChat(summaryAgent, "对话总结内容");
+                session.clearHistory();
+                session.addMessage("历史对话总结", summary);
+                logger.info("---总结内容: {}---", summary);
+
+                // 清空后重新获取历史（否则仍然使用旧的 history 副本）
+                history = session.getHistory();
+            }
+
+            // 记录可用工具
+            chatService.logAvailableTools();
+            logger.info("开始 ReactAgent 对话（支持自动工具调用）");
+
+            // 构建系统提示词（包含历史消息）
+            String systemPrompt = chatService.buildSystemPrompt(history);
+
+            // 创建 ReactAgent
+            ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
+
+            // 执行对话
+            String fullAnswer = chatService.executeChat(agent, request.getQuestion());
+
+            // 更新会话历史
+            session.addMessage(request.getQuestion(), fullAnswer);
+            logger.info("已更新会话历史 - SessionId: {}, 当前消息对数: {}",
+                    request.getId(), session.getMessagePairCount());
+
+            return ResponseEntity.ok(ApiResponse.success(ChatResponse.success(fullAnswer)));
+
+        } catch (Exception e) {
+            logger.error("对话失败", e);
+            return ResponseEntity.ok(ApiResponse.success(ChatResponse.error(e.getMessage())));
+        }
+    }
+
     /**
      * 清空会话历史
      */
