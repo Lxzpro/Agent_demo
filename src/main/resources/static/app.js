@@ -2,7 +2,7 @@
 class SuperBizAgentApp {
     constructor() {
         this.apiBaseUrl = 'http://localhost:9900/api';
-        this.currentMode = 'quick'; // 'quick' | 'stream' | 'summary'
+        this.currentMode = 'quick'; // 'quick' 或 'stream'
         this.sessionId = this.generateSessionId();
         this.isStreaming = false;
         this.currentChatHistory = []; // 当前对话的消息历史
@@ -141,15 +141,11 @@ class SuperBizAgentApp {
             });
         }
         
-        // 下拉菜单项点击（使用 currentTarget 获取 data-mode，避免事件冒泡到子元素时取值异常）
-        const dropdownItems = this.modeDropdown
-            ? this.modeDropdown.querySelectorAll('.dropdown-item')
-            : document.querySelectorAll('.dropdown-item');
+        // 下拉菜单项点击
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
         dropdownItems.forEach(item => {
             item.addEventListener('click', (e) => {
-                const clickedItem = e.currentTarget;
-                const mode = clickedItem ? clickedItem.getAttribute('data-mode') : null;
-                console.log('[mode-select] clicked mode=', mode);
+                const mode = item.getAttribute('data-mode');
                 this.selectMode(mode);
                 this.closeModeDropdown();
             });
@@ -502,26 +498,16 @@ class SuperBizAgentApp {
             this.showNotification('请等待当前对话完成后再切换模式', 'warning');
             return;
         }
-
-        const allowedModes = new Set(['quick', 'stream', 'summary']);
-        if (!mode || !allowedModes.has(mode)) {
-            console.warn('[selectMode] 未知模式，回退到 quick:', mode);
-            this.showNotification('模式识别失败，已回退到快速模式', 'warning');
-            this.currentMode = 'quick';
-            this.updateUI();
-            return;
-        }
         
         this.currentMode = mode;
         this.updateUI();
         
         const modeNames = {
             'quick': '快速',
-            'stream': '流式',
-            'summary': '总结'
+            'stream': '流式'
         };
-        const modeLabel = modeNames[mode] || mode || '快速';
-        this.showNotification(`已切换到${modeLabel}模式`, 'info');
+        
+        this.showNotification(`已切换到${modeNames[mode]}模式`, 'info');
     }
 
     // 更新UI
@@ -530,8 +516,7 @@ class SuperBizAgentApp {
         if (this.currentModeText) {
             const modeNames = {
                 'quick': '快速',
-                'stream': '流式',
-                'summary': '总结'
+                'stream': '流式'
             };
             this.currentModeText.textContent = modeNames[this.currentMode] || '快速';
         }
@@ -598,13 +583,6 @@ class SuperBizAgentApp {
                 await this.sendQuickMessage(message);
             } else if (this.currentMode === 'stream') {
                 await this.sendStreamMessage(message);
-            } else if (this.currentMode === 'summary') {
-                await this.sendSummaryMessage(message);
-            } else {
-                console.warn('[sendMessage] 未知模式，回退到 quick:', this.currentMode);
-                this.currentMode = 'quick';
-                this.updateUI();
-                await this.sendQuickMessage(message);
             }
         } catch (error) {
             console.error('发送消息失败:', error);
@@ -673,56 +651,6 @@ class SuperBizAgentApp {
             }
         } catch (error) {
             // 出错时也要移除等待提示消息
-            if (loadingMessage && loadingMessage.parentNode) {
-                loadingMessage.parentNode.removeChild(loadingMessage);
-            }
-            throw error;
-        }
-    }
-
-    // 发送总结消息（带对话总结能力）
-    async sendSummaryMessage(message) {
-        const loadingMessage = this.addLoadingMessage('正在总结并思考...');
-
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/chat_summary`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    Id: this.sessionId,
-                    Question: message
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP错误: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('[sendSummaryMessage] 响应数据:', JSON.stringify(data));
-
-            if (loadingMessage && loadingMessage.parentNode) {
-                loadingMessage.parentNode.removeChild(loadingMessage);
-            }
-
-            if (data.code === 200 || data.message === 'success') {
-                const chatResponse = data.data;
-
-                if (chatResponse && chatResponse.success) {
-                    const answer = chatResponse.answer || '（无回复内容）';
-                    this.addMessage('assistant', answer);
-                } else if (chatResponse && chatResponse.errorMessage) {
-                    throw new Error(chatResponse.errorMessage);
-                } else {
-                    const fallbackAnswer = chatResponse?.answer || chatResponse?.errorMessage || '服务返回了空内容';
-                    this.addMessage('assistant', fallbackAnswer);
-                }
-            } else {
-                throw new Error(data.message || '请求失败');
-            }
-        } catch (error) {
             if (loadingMessage && loadingMessage.parentNode) {
                 loadingMessage.parentNode.removeChild(loadingMessage);
             }
