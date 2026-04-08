@@ -7,8 +7,8 @@ import com.alibaba.cloud.ai.graph.agent.flow.agent.SupervisorAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import org.example.agent.tool.DateTimeTools;
 import org.example.agent.tool.InternalDocsTools;
-import org.example.agent.tool.QueryLogsTools;
-import org.example.agent.tool.QueryMetricsTools;
+import org.example.agent.tool.StudyPlanGenerationTools;
+import org.example.agent.tool.UserLevelEvaluationTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -35,10 +35,10 @@ public class AiOpsService {
     private InternalDocsTools internalDocsTools;
 
     @Autowired
-    private QueryMetricsTools queryMetricsTools;
+    private UserLevelEvaluationTools userLevelEvaluationTools;
 
-    @Autowired(required = false)  // Mock 模式下才注册
-    private QueryLogsTools queryLogsTools;
+    @Autowired
+    private StudyPlanGenerationTools studyPlanGenerationTools;
 
     /**
      * 执行 AI Ops 告警分析流程
@@ -129,13 +129,7 @@ public class AiOpsService {
      * 根据 cls.mock-enabled 决定是否包含 QueryLogsTools
      */
     private Object[] buildMethodToolsArray() {
-        if (queryLogsTools != null) {
-            // Mock 模式：包含 QueryLogsTools
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, queryLogsTools};
-        } else {
-            // 真实模式：不包含 QueryLogsTools（由 MCP 提供日志查询功能）
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools};
-        }
+        return new Object[]{dateTimeTools, internalDocsTools, userLevelEvaluationTools, studyPlanGenerationTools};
     }
 
     /**
